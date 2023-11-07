@@ -9,6 +9,7 @@ from collections import defaultdict
 import torch
 from torch.utils.data.dataloader import DataLoader
 from mingpt.utils import CfgNode as CN
+import numpy as np
 
 class Trainer:
 
@@ -75,9 +76,20 @@ class Trainer:
         )
 
         model.train()
-        self.iter_num = 0
+
+        # CHANGE set iternum to model if model has iter_num attribute
+        self.iter_num = model.iter_num if hasattr(model, 'iter_num') else 0
+        # CHANGE update last save
+        self.since_last_save = 0
+        # CHANGE update checkpoint number
+        self.checkpoint_num = model.checkpoint_num if hasattr(model, 'checkpoint_num') else 0 
+        # CHANGE set loss
+        self.loss = np.inf
+
         self.iter_time = time.time()
         data_iter = iter(train_loader)
+
+        #
         while True:
 
             # fetch the next batch (x, y) and re-init iterator if needed
@@ -90,6 +102,9 @@ class Trainer:
             x, y = batch
 
             # forward the model
+            # CHANGE replace model loss with initialize loss
+            # logits, self.loss = model(x, y)
+            prev_loss = self.loss
             logits, self.loss = model(x, y)
 
             # backprop and update the parameters
@@ -103,6 +118,27 @@ class Trainer:
             tnow = time.time()
             self.iter_dt = tnow - self.iter_time
             self.iter_time = tnow
+
+            # CHANGE update save count
+            self.since_last_save += 1
+
+            # CHANGE implement checkpoint save
+            if self.loss <= prev_loss and self.since_last_save >= config.checkpoint_iters:
+                self.since_last_save = 0
+                self.checkpoint_num += 1
+
+                # create checkpoint dictionary
+                checkpoint = { 
+                    'model_transformer': model.transformer.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    'loss': self.loss,
+                    'iter_num': self.iter_num,
+                    'checkpoint_num': self.checkpoint_num, 
+                    'model_lm_head': model.lm_head.state_dict(),
+                }
+
+                # save checkpoint
+                torch.save(checkpoint, 'checkpoints/checkpoint_{}.pth'.format(self.checkpoint_num))
 
             # termination conditions
             if config.max_iters is not None and self.iter_num >= config.max_iters:

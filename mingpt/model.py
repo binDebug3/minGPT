@@ -150,11 +150,22 @@ class GPT(nn.Module):
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        # init all weights, and apply a special scaled init to the residual projections, per GPT-2 paper
-        self.apply(self._init_weights)
-        for pn, p in self.named_parameters():
-            if pn.endswith('c_proj.weight'):
-                torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
+        # CHANGE load the previous state dictionary if it exists
+        if config.checkpoint is not None:
+            self.checkpoint = torch.load(config.checkpoint)
+            self.transformer.load_state_dict(self.checkpoint['model_transformer'])
+            self.lm_head.load_state_dict(self.checkpoint['model_lm_head'])
+            self.iter_num = self.checkpoint['iter_num']
+            self.checkpoint_num = self.checkpoint['checkpoint_num']
+
+        # PREVIOUS implementation
+        else:
+            # init all weights, and apply a special scaled init to the residual projections, per GPT-2 paper
+            self.checkpoint = None
+            self.apply(self._init_weights)
+            for pn, p in self.named_parameters():
+                if pn.endswith('c_proj.weight'):
+                    torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
 
         # report number of parameters (note we don't count the decoder parameters in lm_head)
         n_params = sum(p.numel() for p in self.transformer.parameters())
@@ -185,6 +196,8 @@ class GPT(nn.Module):
         config.model_type = model_type
         config.vocab_size = 50257 # openai's model vocabulary
         config.block_size = 1024  # openai's model block_size
+        # CHANGE set checkpoint to None
+        config.checkpoint = None
         model = GPT(config)
         sd = model.state_dict()
 
@@ -255,6 +268,11 @@ class GPT(nn.Module):
             {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
         ]
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
+        
+        # CHANGE load the previous state dictionary if it exists
+        if self.checkpoint:
+            optimizer.load_state_dict(self.checkpoint['optimizer_state_dict'])
+        
         return optimizer
 
     def forward(self, idx, targets=None):
