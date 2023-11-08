@@ -77,16 +77,24 @@ class Trainer:
 
         model.train()
 
+        # CHANGE add checkpoint name
+        checkpoint_name = config.checkpoint_name if hasattr(config, 'checkpoint_name') else 'checkpoint'
         # CHANGE set iternum to model if model has iter_num attribute
         self.iter_num = model.iter_num if hasattr(model, 'iter_num') else 0
         # CHANGE update last save
         self.since_last_save = 0
         # CHANGE update checkpoint number
         self.checkpoint_num = model.checkpoint_num if hasattr(model, 'checkpoint_num') else 0 
+        # CHANGE save loss
+        self.saved_loss = model.saved_loss if hasattr(model, 'saved_loss') else []
         # CHANGE set loss
-        self.loss = np.inf
+        self.loss = self.saved_loss[-1] if self.saved_loss else np.inf
 
+        # CHANGE add last save time
+        self.since_last_save = 0
         self.iter_time = time.time()
+        # CHANGE add iteration list
+        self.iter_list = model.iter_list if hasattr(model, 'iter_list') else []
         data_iter = iter(train_loader)
 
         #
@@ -100,6 +108,10 @@ class Trainer:
                 batch = next(data_iter)
             batch = [t.to(self.device) for t in batch]
             x, y = batch
+
+            # CHANGE squeeze input and output
+            x = x.squeeze()
+            y = y.squeeze()
 
             # forward the model
             # CHANGE replace model loss with initialize loss
@@ -130,11 +142,13 @@ class Trainer:
                 # create checkpoint dictionary
                 checkpoint = { 
                     'model_transformer': model.transformer.state_dict(),
+                    'model_lm_head': model.lm_head.state_dict(),
                     'optimizer_state_dict': self.optimizer.state_dict(),
                     'loss': self.loss,
                     'iter_num': self.iter_num,
+                    'iter_list': self.iter_list.append(self.iter_num),
                     'checkpoint_num': self.checkpoint_num, 
-                    'model_lm_head': model.lm_head.state_dict(),
+                    'saved_loss': self.saved_loss.append(self.loss),
                 }
 
                 # save checkpoint
