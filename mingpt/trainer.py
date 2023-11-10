@@ -89,6 +89,7 @@ class Trainer:
         self.saved_loss = model.saved_loss if hasattr(model, 'saved_loss') else []
         # CHANGE set loss
         self.loss = self.saved_loss[-1] if self.saved_loss else np.inf
+        self.current_loss = []
 
         # CHANGE add last save time
         self.since_last_save = 0
@@ -118,6 +119,7 @@ class Trainer:
             # logits, self.loss = model(x, y)
             prev_loss = self.loss
             logits, self.loss = model(x, y)
+            self.current_loss.append(self.loss.detach())
 
             # backprop and update the parameters
             model.zero_grad(set_to_none=True)
