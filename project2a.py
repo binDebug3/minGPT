@@ -61,10 +61,10 @@ if __name__ == '__main__':
 
     # set up model configurations
     model_config = GPT.get_default_config()
-    # model_config.model_type = 'gpt-nano'
-    model_config.model_type = 'gpt2'
-    model_config.vocab_size = data.vocab_size
-    model_config.block_size = data.max_length - 1
+    model_config.model_type = 'gpt-nano'
+    # model_config.model_type = 'gpt2'
+    model_config.vocab_size = rp_dataset.vocab_size
+    model_config.block_size = rp_dataset.max_length
     model_config.checkpoint = None
 
     # set up model with configurations
@@ -83,13 +83,13 @@ if __name__ == '__main__':
     # train_config.checkpoint_name = path
 
     # set up trainer with configurations
-    trainer = Trainer(train_config, model, data)
+    trainer = Trainer(train_config, model, rp_dataset)
     trainer.set_callback('on_batch_end', batch_end_callback)
     trainer.run()
 
 
     # plot the loss of every hundred elements
-    loss_list = [a.detach().cpu() for a in trainer.saved_loss]
+    loss_list = [a.detach().cpu() for a in trainer.curr_loss]
     length = 100
     new_losses = np.mean(np.array(loss_list).reshape(-1, length), axis=1)
 
